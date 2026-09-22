@@ -1,0 +1,2 @@
+ALTER TABLE mentors ADD COLUMN show_profile INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE mentor_applications ADD COLUMN show_profile INTEGER NOT NULL DEFAULT 1;

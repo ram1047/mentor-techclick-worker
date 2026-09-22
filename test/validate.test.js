@@ -65,7 +65,24 @@ test("apply form requires UPI and a real track", () => {
     payout_upi: "neha@okaxis",
   });
   assert.equal(ok.value.payout_upi, "neha@okaxis");
+  assert.equal(ok.value.show_profile, 1);
   assert.deepEqual(ok.value.tracks, ["FortiGate"]);
+});
+
+test("mentor can keep the profile hidden", () => {
+  const hidden = parseApply({
+    name: "Neha Shah",
+    email: "neha@example.com",
+    phone: "9876543210",
+    tracks: ["FortiGate"],
+    years: 8,
+    weekly_inr: 4000,
+    monthly_inr: 14000,
+    bio: "I have run FortiGate firewalls for enterprise branches, including SD-WAN, IPsec, and HA cutovers for eight years.",
+    payout_upi: "neha@okaxis",
+    show_profile: false,
+  });
+  assert.equal(hidden.value.show_profile, 0);
 });
 
 test("honeypot short-circuits storage", () => {

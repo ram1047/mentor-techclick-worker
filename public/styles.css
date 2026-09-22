@@ -256,7 +256,8 @@ label.choice input { width: auto; min-height: 22px; }
 
 @media (max-width: 860px) {
   .hero, .money, .grid, .profile, .form-row { grid-template-columns: 1fr; }
-  .links a:not(.btn) { display: none; }
+  .links a:not(.btn):not(.keep) { display: none; }
+  .links a.keep { display: inline-flex; padding: 0 10px; }
   .nav { padding: 10px 12px; }
   .dock { display: block; }
   h1 { font-size: 42px; }

@@ -82,6 +82,7 @@ function nav(current) {
       el("b", {}, ["Mentor Desk"]),
     ]),
     el("nav", { class: "links", "aria-label": "Desk" }, [
+      item("/enroll", "Enroll", "keep"),
       item("/mentors", "Mentors"),
       item("/how", "How pay works"),
       item("/join", "Become a mentor", "btn copper"),
@@ -104,16 +105,19 @@ function footer() {
 }
 
 function dock() {
-  if (location.pathname === "/desk" || location.pathname === "/") return null;
-  const href = location.pathname === "/join" ? "/mentors" : "/mentors";
-  const label = location.pathname === "/join" ? "See mentors" : "Find a mentor";
+  if (location.pathname === "/desk" || location.pathname === "/" || location.pathname === "/enroll") return null;
+  const href = "/enroll";
+  const label = "Enroll and pick a mentor";
   return el("div", { class: "dock" }, [
     el("a", { class: "btn", href, onclick: (event) => { event.preventDefault(); go(href); } }, [label]),
   ]);
 }
 
 function shell(current, nodes) {
-  app.replaceChildren(nav(current), el("main", { id: "main", class: "wrap" }, nodes), footer(), dock());
+  const parts = [nav(current), el("main", { id: "main", class: "wrap" }, nodes), footer()];
+  const bar = dock();
+  if (bar) parts.push(bar);
+  app.replaceChildren(...parts);
 }
 
 function chips(tracks) {
@@ -132,7 +136,10 @@ function mentorCard(mentor) {
       el("div", {}, [el("b", {}, [inr(mentor.weekly_inr)]), el("span", { class: "small muted" }, ["week · mentor gets ", inr(mentor.weekly_share_inr)])]),
       el("div", {}, [el("b", {}, [inr(mentor.monthly_inr)]), el("span", { class: "small muted" }, ["month · mentor gets ", inr(mentor.monthly_share_inr)])]),
     ]),
-    el("a", { class: "btn", href: `/m/${mentor.slug}`, onclick: (event) => { event.preventDefault(); go(`/m/${mentor.slug}`); } }, ["Choose this mentor"]),
+    el("div", { class: "actions" }, [
+      el("a", { class: "btn", href: `/enroll?mentor=${mentor.slug}`, onclick: (event) => { event.preventDefault(); go(`/enroll?mentor=${mentor.slug}`); } }, ["Enroll with this mentor"]),
+      el("a", { class: "text-btn", href: `/m/${mentor.slug}`, onclick: (event) => { event.preventDefault(); go(`/m/${mentor.slug}`); } }, ["See profile"]),
+    ]),
   ]);
 }
 
@@ -165,7 +172,7 @@ function renderHome() {
         el("h1", {}, ["Choose the person who already runs the box."]),
         el("p", { class: "lede" }, ["Networking and security people pick a mentor. You pay for a week or a month. The mentor keeps 80 percent of that seat. Techclick keeps 20 percent and confirms the payment."]),
         el("div", { class: "row" }, [
-          el("a", { class: "btn", href: "/mentors", onclick: (event) => { event.preventDefault(); go("/mentors"); } }, ["See mentors"]),
+          el("a", { class: "btn", href: "/enroll", onclick: (event) => { event.preventDefault(); go("/enroll"); } }, ["Enroll and pick a mentor"]),
           el("a", { class: "btn ghost", href: "/join", onclick: (event) => { event.preventDefault(); go("/join"); } }, ["I want to mentor and earn"]),
         ]),
       ]),
@@ -376,6 +383,88 @@ function field(label, name, type, placeholder) {
   return el("label", {}, [label, el("input", { name, type, required: "required", placeholder, autocomplete: name === "name" ? "name" : name })]);
 }
 
+function renderEnroll() {
+  const preset = new URLSearchParams(location.search).get("mentor") || "";
+  const form = el("form", { class: "form sheet" });
+  const status = el("div");
+  const summary = el("p", { class: "calc" }, ["Pick a mentor to see the week and month price."]);
+  const mentorSelect = el("select", { name: "mentor_slug", required: "required", "aria-label": "Mentor" }, [
+    el("option", { value: "" }, ["Choose a mentor"]),
+    ...mentors.map((mentor) => el("option", { value: mentor.slug }, [
+      `${mentor.name} · ${inr(mentor.weekly_inr)} a week · ${inr(mentor.monthly_inr)} a month`,
+    ])),
+  ]);
+  if (mentors.some((mentor) => mentor.slug === preset)) mentorSelect.value = preset;
+  const weekly = el("input", { type: "radio", name: "plan", value: "weekly" });
+  const monthly = el("input", { type: "radio", name: "plan", value: "monthly" });
+  weekly.checked = true;
+  const paint = () => {
+    const mentor = mentors.find((item) => item.slug === mentorSelect.value);
+    if (!mentor) {
+      summary.textContent = "Pick a mentor to see the week and month price.";
+      return;
+    }
+    const plan = form.querySelector("input[name=plan]:checked")?.value || "weekly";
+    const amount = plan === "weekly" ? mentor.weekly_inr : mentor.monthly_inr;
+    const share = plan === "weekly" ? mentor.weekly_share_inr : mentor.monthly_share_inr;
+    const includes = plan === "weekly" ? mentor.weekly_includes : mentor.monthly_includes;
+    summary.textContent = `${mentor.name}: ${inr(amount)} for this ${plan === "weekly" ? "week" : "month"}. Mentor receives ${inr(share)}. ${includes}`;
+  };
+  form.addEventListener("change", paint);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.replaceChildren();
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      const res = await fetch("/api/requests", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Enrollment did not save.");
+      form.replaceChildren(
+        el("h2", {}, ["Enrollment received"]),
+        el("p", {}, [`Reference ${body.reference}. You asked for ${body.mentor_name}. ${body.message}`]),
+        el("p", { class: "calc" }, [`${inr(body.amount_inr)} for this ${body.plan === "weekly" ? "week" : "month"}. ${body.mentor_name} receives ${inr(body.mentor_share_inr)} after the seat is marked paid.`]),
+        el("a", { class: "btn", href: wa(`Mentor Desk enrollment ${body.reference}. I picked ${body.mentor_name}.`), target: "_blank", rel: "noopener" }, ["Message Techclick on WhatsApp"]),
+      );
+    } catch (error) {
+      status.replaceChildren(el("p", { class: "notice error" }, [error.message]));
+      button.disabled = false;
+    }
+  });
+  form.append(
+    el("h2", {}, ["Your seat"]),
+    el("label", {}, ["Which mentor do you want?", mentorSelect]),
+    el("fieldset", { class: "form", style: "border:0;padding:0" }, [
+      el("legend", { class: "small" }, ["Week or month"]),
+      el("label", { class: "choice" }, [weekly, "Weekly seat"]),
+      el("label", { class: "choice" }, [monthly, "Monthly seat"]),
+    ]),
+    summary,
+    field("Your name", "name", "text", "As you want the mentor to call you"),
+    field("Email", "email", "email", "you@company.com"),
+    field("WhatsApp", "phone", "tel", "+91 98xxx xxxxx"),
+    el("label", {}, ["What are you stuck on?", el("textarea", { name: "goal", required: "required", minlength: "20", maxlength: "800", placeholder: "Example: FortiGate SD-WAN spoke is up, but the hub is not installing the route." })]),
+    el("label", { class: "honeypot", "aria-hidden": "true" }, ["Leave blank", el("input", { name: "tc_leave_blank", tabindex: "-1", autocomplete: "off" })]),
+    status,
+    el("button", { class: "btn copper", type: "submit" }, ["Enroll with this mentor"]),
+  );
+  paint();
+  shell("/enroll", [
+    el("section", { class: "section" }, [
+      el("p", { class: "kicker" }, ["Student enroll"]),
+      el("h1", {}, ["Pick the mentor, then the seat."]),
+      el("div", { class: "money" }, [
+        step("1", "Choose the mentor", "Only mentors who chose to show a profile are in the list."),
+        step("2", "Week or month", "The price on the form is the price for that mentor."),
+        step("3", "Techclick confirms", "You get the payment step on email or WhatsApp. The mentor is paid their 80 percent after that."),
+      ]),
+      mentors.length ? form : el("p", { class: "notice" }, [loadError || "No mentor is showing a profile yet. Check back, or message Techclick on WhatsApp."]),
+    ]),
+  ]);
+  document.title = "Enroll with a Techclick mentor";
+}
+
 function renderJoin() {
   const preset = new URLSearchParams(location.search).get("track") || "";
   const form = el("form", { class: "form sheet" });
@@ -397,6 +486,7 @@ function renderJoin() {
     data.years = Number(data.years);
     data.weekly_inr = Number(data.weekly_inr);
     data.monthly_inr = Number(data.monthly_inr);
+    data.show_profile = Boolean(form.querySelector("input[name=show_profile]")?.checked);
     try {
       const res = await fetch("/api/apply", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
       const body = await res.json();
@@ -404,7 +494,10 @@ function renderJoin() {
       form.replaceChildren(
         el("h2", {}, ["Application received"]),
         el("p", {}, [`Reference ${body.reference}. ${body.message}`]),
-        el("p", { class: "calc" }, [`If approved, you receive ${inr(body.weekly_share_inr)} on a weekly seat and ${inr(body.monthly_share_inr)} on a monthly seat, on the UPI id you gave.`]),
+        el("p", { class: "calc" }, [
+          `If approved, you receive ${inr(body.weekly_share_inr)} on a weekly seat and ${inr(body.monthly_share_inr)} on a monthly seat, on the UPI id you gave. `,
+          body.show_profile ? "Students will be able to see your profile and pick you." : "Your profile stays hidden until Techclick switches it on.",
+        ]),
       );
     } catch (error) {
       status.replaceChildren(el("p", { class: "notice error" }, [error.message]));
@@ -437,6 +530,14 @@ function renderJoin() {
     calc,
     el("label", {}, ["Short bio", el("textarea", { name: "bio", required: "required", minlength: "80", maxlength: "1200", placeholder: "What you have actually run in production, and the kind of issue you want on your desk." })]),
     field("UPI id for your 80 percent", "payout_upi", "text", "name@okaxis"),
+    el("label", { class: "choice" }, [
+      (() => {
+        const box = el("input", { type: "checkbox", name: "show_profile", value: "1" });
+        box.checked = true;
+        return box;
+      })(),
+      "Show my profile on the public desk so students can pick me",
+    ]),
     el("label", { class: "honeypot", "aria-hidden": "true" }, ["Leave blank", el("input", { name: "tc_leave_blank", tabindex: "-1", autocomplete: "off" })]),
     status,
     el("button", { class: "btn copper", type: "submit" }, ["Submit application"]),
@@ -579,7 +680,10 @@ function appCard(row, box) {
     el("p", {}, [tracks]),
     el("p", { class: "small" }, [`Week ${inr(row.weekly_inr)} → mentor ${inr(shareAmount(row.weekly_inr))}. Month ${inr(row.monthly_inr)} → mentor ${inr(shareAmount(row.monthly_inr))}.`]),
     el("p", {}, [row.bio]),
-    el("p", { class: "small muted" }, [`UPI ${row.payout_upi}. ${row.email}. ${row.phone}. ${row.linkedin || ""}`]),
+    el("p", { class: "small muted" }, [
+      `UPI ${row.payout_upi}. ${row.email}. ${row.phone}. ${row.linkedin || ""} `,
+      Number(row.show_profile) === 0 ? "Profile: hidden until you show it." : "Profile: students can see it after approval.",
+    ]),
     el("div", { class: "actions" }, [
       el("button", { class: "btn", type: "button", onclick: () => deskAction(box, "/api/desk/application", { id: row.id, action: "approve" }) }, ["Approve and put them live"]),
       el("button", { class: "text-btn", type: "button", onclick: () => deskAction(box, "/api/desk/application", { id: row.id, action: "decline" }) }, ["Decline"]),
@@ -589,7 +693,7 @@ function appCard(row, box) {
 
 function mentorAdmin(row, box) {
   const form = el("form", { class: "desk-card form" }, [
-    el("strong", {}, [`${row.name} · ${row.status}`]),
+    el("strong", {}, [`${row.name} · ${row.status} · ${Number(row.show_profile) === 0 ? "profile hidden" : "profile visible"}`]),
     el("div", { class: "form-row" }, [
       el("label", {}, ["Weekly rupees", el("input", { name: "weekly_inr", type: "number", value: String(row.weekly_inr) })]),
       el("label", {}, ["Monthly rupees", el("input", { name: "monthly_inr", type: "number", value: String(row.monthly_inr) })]),
@@ -597,6 +701,7 @@ function mentorAdmin(row, box) {
     el("div", { class: "actions" }, [
       el("button", { class: "btn", type: "submit" }, ["Save prices"]),
       el("button", { class: "text-btn", type: "button", onclick: () => deskAction(box, "/api/desk/availability", { id: row.id, status: row.status === "live" ? "paused" : "live" }) }, [row.status === "live" ? "Pause" : "Make live"]),
+      el("button", { class: "text-btn", type: "button", onclick: () => deskAction(box, "/api/desk/visibility", { id: row.id, show_profile: Number(row.show_profile) === 0 ? 1 : 0 }) }, [Number(row.show_profile) === 0 ? "Show profile" : "Hide profile"]),
     ]),
   ]);
   form.addEventListener("submit", async (event) => {
@@ -631,6 +736,7 @@ function render() {
   const path = location.pathname;
   if (path === "/") renderHome();
   else if (path === "/mentors") renderMentors();
+  else if (path === "/enroll") renderEnroll();
   else if (path === "/join") renderJoin();
   else if (path === "/how") renderHow();
   else if (path === "/desk") renderDesk();

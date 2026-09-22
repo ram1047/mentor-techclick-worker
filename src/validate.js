@@ -110,6 +110,12 @@ export function isHoneypot(body) {
   return Boolean(String(body?.tc_leave_blank || "").trim());
 }
 
+export function cleanShowProfile(value) {
+  if (value === true || value === 1 || value === "1" || value === "true" || value === "yes" || value === "on") return 1;
+  if (value === false || value === 0 || value === "0" || value === "false" || value === "no" || value === "off") return 0;
+  return 1;
+}
+
 export function parseSeat(body) {
   if (!body || typeof body !== "object") return { error: "Form was empty." };
   if (isHoneypot(body)) return { honeypot: true };
@@ -141,6 +147,7 @@ export function parseApply(body) {
   const bio = cleanText(body.bio, 80, 1200);
   const linkedin = cleanUrl(body.linkedin);
   const payout = cleanUpi(body.payout_upi);
+  const showProfile = cleanShowProfile(body.show_profile);
   if (!name) return { error: "Add your name." };
   if (!email) return { error: "Add a real email." };
   if (!phone) return { error: "Add a WhatsApp number with country code." };
@@ -153,6 +160,9 @@ export function parseApply(body) {
   if (linkedin === null) return { error: "LinkedIn link must start with https, or leave it blank." };
   if (!payout) return { error: "Add the UPI id where Techclick should send your share." };
   return {
-    value: { name, email, phone, tracks, years, weekly_inr: weekly, monthly_inr: monthly, bio, linkedin: linkedin || "", payout_upi: payout },
+    value: {
+      name, email, phone, tracks, years, weekly_inr: weekly, monthly_inr: monthly,
+      bio, linkedin: linkedin || "", payout_upi: payout, show_profile: showProfile,
+    },
   };
 }

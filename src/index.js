@@ -22,6 +22,10 @@ const PAGES = {
     title: "Mentors on the Techclick desk",
     description: "Browse live networking mentors. Choose a weekly seat or a monthly seat.",
   },
+  "/enroll": {
+    title: "Enroll with a Techclick mentor",
+    description: "Students pick a mentor, then choose a weekly seat or a monthly seat. Techclick confirms before payment.",
+  },
   "/join": {
     title: "Become a Techclick mentor and earn",
     description:
@@ -171,15 +175,17 @@ async function handleApi(request, env, url) {
 
   if (request.method === "GET" && path === "/api/mentors") {
     const rows = await env.DB.prepare(
-      "SELECT * FROM mentors WHERE status = 'live' ORDER BY is_founding DESC, name ASC",
+      "SELECT * FROM mentors WHERE status = 'live' AND show_profile = 1 ORDER BY is_founding DESC, name ASC",
     ).all();
     return json({ ok: true, mentors: (rows.results || []).map(publicMentor) });
   }
 
   const mentorMatch = path.match(/^\/api\/mentors\/([a-z0-9-]{2,60})$/);
   if (request.method === "GET" && mentorMatch) {
-    const row = await env.DB.prepare("SELECT * FROM mentors WHERE slug = ? AND status = 'live'").bind(mentorMatch[1]).first();
-    if (!row) return json({ ok: false, error: "That mentor is not on the desk." }, 404);
+    const row = await env.DB.prepare(
+      "SELECT * FROM mentors WHERE slug = ? AND status = 'live' AND show_profile = 1",
+    ).bind(mentorMatch[1]).first();
+    if (!row) return json({ ok: false, error: "That mentor is not showing a public profile." }, 404);
     const open = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM seat_requests WHERE mentor_id = ? AND status IN ('requested','confirmed','paid')",
     ).bind(row.id).first();
@@ -195,8 +201,10 @@ async function handleApi(request, env, url) {
     if (parsed.honeypot) return json({ ok: true, reference: "RECEIVED", message: "Request received." });
     if (parsed.error) return json({ ok: false, error: parsed.error }, 400);
     const seat = parsed.value;
-    const mentor = await env.DB.prepare("SELECT * FROM mentors WHERE slug = ? AND status = 'live'").bind(seat.mentor_slug).first();
-    if (!mentor) return json({ ok: false, error: "That mentor is not taking seats right now." }, 404);
+    const mentor = await env.DB.prepare(
+      "SELECT * FROM mentors WHERE slug = ? AND status = 'live' AND show_profile = 1",
+    ).bind(seat.mentor_slug).first();
+    if (!mentor) return json({ ok: false, error: "Pick a mentor who is showing a public profile." }, 404);
     const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const recent = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM seat_requests WHERE email = ? AND created_at > ?",
@@ -268,11 +276,11 @@ async function handleApi(request, env, url) {
     const id = crypto.randomUUID();
     await env.DB.prepare(
       `INSERT INTO mentor_applications
-        (id, name, email, phone, tracks, years, weekly_inr, monthly_inr, bio, linkedin, payout_upi, status, mentor_slug, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', ?)`,
+        (id, name, email, phone, tracks, years, weekly_inr, monthly_inr, bio, linkedin, payout_upi, status, mentor_slug, show_profile, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', ?, ?)`,
     ).bind(
       id, app.name, app.email, app.phone, JSON.stringify(app.tracks), app.years,
-      app.weekly_inr, app.monthly_inr, app.bio, app.linkedin, app.payout_upi, new Date().toISOString(),
+      app.weekly_inr, app.monthly_inr, app.bio, app.linkedin, app.payout_upi, app.show_profile, new Date().toISOString(),
     ).run();
     console.log(JSON.stringify({ event: "mentor_application", reference: referenceOf(id) }));
     return json({
@@ -280,7 +288,10 @@ async function handleApi(request, env, url) {
       reference: referenceOf(id),
       weekly_share_inr: mentorShare(app.weekly_inr),
       monthly_share_inr: mentorShare(app.monthly_inr),
-      message: "Application received. If Techclick approves it, your card goes live and people can request you.",
+      show_profile: app.show_profile,
+      message: app.show_profile
+        ? "Application received. If Techclick approves it, students can see your profile and pick you."
+        : "Application received. If Techclick approves it, your profile stays hidden until you choose to show it.",
     }, 201);
   }
 
@@ -302,7 +313,7 @@ async function handleDesk(request, env, path) {
          FROM seat_requests r JOIN mentors m ON m.id = r.mentor_id
          ORDER BY r.created_at DESC LIMIT 100`,
       ).all(),
-      env.DB.prepare("SELECT id, slug, name, status, weekly_inr, monthly_inr, seats, is_founding FROM mentors ORDER BY is_founding DESC, name").all(),
+      env.DB.prepare("SELECT id, slug, name, status, weekly_inr, monthly_inr, seats, is_founding, show_profile FROM mentors ORDER BY is_founding DESC, name").all(),
     ]);
     return json({
       ok: true,
@@ -350,12 +361,12 @@ async function handleDesk(request, env, path) {
       env.DB.prepare(
         `INSERT INTO mentors
           (id, slug, name, headline, bio, tracks, years, city, languages, weekly_inr, monthly_inr,
-           weekly_includes, monthly_includes, seats, status, verified, is_founding, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'Live online, India', 'Hindi and English', ?, ?, ?, ?, 3, 'live', 1, 0, ?)`,
+           weekly_includes, monthly_includes, seats, status, verified, is_founding, show_profile, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Live online, India', 'Hindi and English', ?, ?, ?, ?, 3, 'live', 1, 0, ?, ?)`,
       ).bind(
         mentorId, slug, app.name, `${app.years} years · ${trackLabel}`,
         app.bio, app.tracks, app.years, app.weekly_inr, app.monthly_inr, weeklyIncludes, monthlyIncludes,
-        new Date().toISOString(),
+        Number(app.show_profile) === 1 ? 1 : 0, new Date().toISOString(),
       ),
       env.DB.prepare(
         "UPDATE mentor_applications SET status = 'approved', mentor_slug = ? WHERE id = ? AND status = 'pending'",
@@ -392,6 +403,15 @@ async function handleDesk(request, env, path) {
     return json({ ok: true, weekly_share_inr: mentorShare(weekly), monthly_share_inr: mentorShare(monthly) });
   }
 
+  if (path === "/api/desk/visibility") {
+    const id = String(data.id || "");
+    const show = data.show_profile === 1 || data.show_profile === true || data.show_profile === "1" ? 1 : 0;
+    if (!/^[0-9a-z-]{2,80}$/i.test(id)) return json({ ok: false, error: "Pick a mentor." }, 400);
+    const result = await env.DB.prepare("UPDATE mentors SET show_profile = ? WHERE id = ?").bind(show, id).run();
+    if (!result.meta?.changes) return json({ ok: false, error: "That mentor was not found." }, 404);
+    return json({ ok: true, show_profile: show });
+  }
+
   if (path === "/api/desk/availability") {
     const id = String(data.id || "");
     const status = data.status === "live" || data.status === "paused" ? data.status : "";
@@ -411,7 +431,7 @@ async function pageFor(url, env) {
   const match = url.pathname.match(/^\/m\/([a-z0-9-]{2,60})$/);
   if (match) {
     const row = await env.DB.prepare(
-      "SELECT name, headline FROM mentors WHERE slug = ? AND status = 'live'",
+      "SELECT name, headline FROM mentors WHERE slug = ? AND status = 'live' AND show_profile = 1",
     ).bind(match[1]).first();
     if (!row) {
       return {

@@ -44,7 +44,7 @@ function wa(text) {
 }
 
 function groupText() {
-  return `Techclick Mentor Desk is open worldwide.\n\nRam Dixit — cybersecurity, cloud security, pen testing, Azure, AWS, and WAF (Cloudflare, Barracuda, Akamai). 5 out of 5 by 129 students. 700 students trained. Job support and online interview practice.\n\nStudents pick a mentor. Mentors keep 80% and earn every week.\n\n${catalog.public_url || location.origin}`;
+  return `Techclick Mentor Desk is open worldwide.\n\nTechclick Expert — cybersecurity, cloud security, pen testing, Azure, AWS, and WAF (Cloudflare, Barracuda, Akamai). 5 out of 5 by 129 students. 700 students trained. Job support and online interview practice.\n\nStudents pick a mentor. Mentors keep 80% and earn every week.\n\n${catalog.public_url || location.origin}`;
 }
 
 function go(href) {

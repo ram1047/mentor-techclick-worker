@@ -506,6 +506,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/m/ram-dixit" || url.pathname === "/api/mentors/ram-dixit") {
+        url.pathname = url.pathname.replace("ram-dixit", "techclick-expert");
+        return Response.redirect(url.toString(), 308);
+      }
       if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
         url.pathname = url.pathname.replace(/\/+$/, "");
         return Response.redirect(url.toString(), 308);

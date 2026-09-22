@@ -44,7 +44,7 @@ function wa(text) {
 }
 
 function groupText() {
-  return `Techclick Mentor Desk is open.\n\nIf you work on Zscaler, Palo Alto, FortiGate, F5, Cisco ISE, or Prisma — pick a mentor for one week or one month.\n\nIf you can teach that work, apply as a mentor. You keep 80% of the seat. Techclick keeps 20%.\n\n${catalog.public_url || location.origin}`;
+  return `Techclick Mentor Desk is open worldwide.\n\nRam Dixit — cybersecurity, cloud security, pen testing, Azure, AWS, and WAF (Cloudflare, Barracuda, Akamai). 5 out of 5 by 129 students. 700 students trained. Job support and online interview practice.\n\nStudents pick a mentor. Mentors keep 80% and earn every week.\n\n${catalog.public_url || location.origin}`;
 }
 
 function go(href) {
@@ -120,8 +120,33 @@ function shell(current, nodes) {
   app.replaceChildren(...parts);
 }
 
-function chips(tracks) {
-  return el("div", { class: "chips" }, tracks.slice(0, 4).map((track) => el("span", { class: "chip" }, [track])));
+function chips(tracks, limit) {
+  const shown = typeof limit === "number" ? tracks.slice(0, limit) : tracks;
+  return el("div", { class: "chips" }, shown.map((track) => el("span", { class: "chip" }, [track])));
+}
+
+function stars(count) {
+  const n = Math.max(0, Math.min(5, Number(count) || 0));
+  return "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n);
+}
+
+function proof(mentor) {
+  if (!mentor.rating_count && !mentor.students_trained) return null;
+  return el("div", {}, [
+    mentor.rating_count ? el("p", { class: "stars" }, [`${stars(mentor.rating_out_of)}  ${mentor.rating_out_of} out of 5 by ${mentor.rating_count} students`]) : null,
+    el("div", { class: "stats" }, [
+      stat(mentor.students_trained, "Students trained"),
+      stat(mentor.interviews_taken, "Interviews taken"),
+      stat(mentor.interviews_given, "Interviews given"),
+      stat(mentor.rating_count, "Student ratings"),
+    ].filter(Boolean)),
+    (mentor.offers || []).length ? el("div", { class: "chips" }, mentor.offers.map((offer) => el("span", { class: "chip" }, [offer]))) : null,
+  ]);
+}
+
+function stat(value, label) {
+  if (!value) return null;
+  return el("div", { class: "stat" }, [el("b", {}, [String(value)]), el("span", {}, [label])]);
 }
 
 function mentorCard(mentor) {
@@ -131,7 +156,8 @@ function mentorCard(mentor) {
     el("h3", {}, [mentor.name]),
     el("p", {}, [mentor.headline]),
     el("p", { class: "meta" }, [`${mentor.years} years`, mentor.city, mentor.languages]),
-    chips(mentor.tracks || []),
+    proof(mentor),
+    chips(mentor.tracks || [], 8),
     el("div", { class: "price-pair" }, [
       el("div", {}, [el("b", {}, [inr(mentor.weekly_inr)]), el("span", { class: "small muted" }, ["week · mentor gets ", inr(mentor.weekly_share_inr)])]),
       el("div", {}, [el("b", {}, [inr(mentor.monthly_inr)]), el("span", { class: "small muted" }, ["month · mentor gets ", inr(mentor.monthly_share_inr)])]),
@@ -221,7 +247,8 @@ function ticket(mentor, plan) {
     box.replaceChildren(
       el("p", { class: "kicker" }, [active === "weekly" ? "Seat · weekly" : "Seat · monthly"]),
       el("h2", {}, [mentor.name]),
-      chips(mentor.tracks || []),
+      mentor.rating_count ? el("p", { class: "stars" }, [`${stars(mentor.rating_out_of)}  ${mentor.rating_out_of}/5 · ${mentor.rating_count} students · ${mentor.students_trained} trained`]) : null,
+      chips(mentor.tracks || [], 6),
       el("div", { class: "plan-switch" }, [
         el("button", { class: "text-btn", type: "button", "aria-pressed": active === "weekly" ? "true" : "false", onclick: () => draw("weekly") }, ["Weekly"]),
         el("button", { class: "text-btn", type: "button", "aria-pressed": active === "monthly" ? "true" : "false", onclick: () => draw("monthly") }, ["Monthly"]),
@@ -306,6 +333,7 @@ async function renderProfile() {
         el("h1", {}, [mentor.name]),
         el("p", { class: "lede" }, [mentor.headline]),
         el("p", { class: "meta" }, [`${mentor.years} years`, mentor.city, mentor.languages, mentor.seats_left === 0 ? "No open seat" : `${mentor.seats_left} open seats`]),
+        proof(mentor),
         chips(mentor.tracks || []),
         el("p", { style: "margin-top:14px" }, [mentor.bio]),
       ]),

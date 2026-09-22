@@ -78,11 +78,18 @@ function referenceOf(id) {
 
 function publicMentor(row) {
   let tracks = [];
+  let offers = [];
   try {
     const parsed = JSON.parse(row.tracks);
     if (Array.isArray(parsed)) tracks = parsed;
   } catch {
     tracks = [];
+  }
+  try {
+    const parsedOffers = JSON.parse(row.offers || "[]");
+    if (Array.isArray(parsedOffers)) offers = parsedOffers;
+  } catch {
+    offers = [];
   }
   return {
     slug: row.slug,
@@ -102,6 +109,12 @@ function publicMentor(row) {
     seats: row.seats,
     verified: row.verified === 1,
     founding: row.is_founding === 1,
+    offers,
+    rating_out_of: Number(row.rating_out_of || 0),
+    rating_count: Number(row.rating_count || 0),
+    students_trained: Number(row.students_trained || 0),
+    interviews_taken: Number(row.interviews_taken || 0),
+    interviews_given: Number(row.interviews_given || 0),
   };
 }
 

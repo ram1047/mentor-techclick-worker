@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /desk
+Disallow: /api/
+Sitemap: https://mentor.techclick.in/sitemap.xml

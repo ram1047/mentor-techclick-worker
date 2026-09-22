@@ -1,0 +1,40 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          elif [ -f package.json ]; then
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Check
+        run: npm run check
+
+      - name: Deploy to Cloudflare
+        env:
+          RAW_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          CLEAN_CF_TOKEN="$(printf '%s' "$RAW_CF_TOKEN" | tr -d '[:space:]')"
+          echo "cleaned token length: ${#CLEAN_CF_TOKEN} (a cfat_ token is 53 chars)"
+          export CLOUDFLARE_API_TOKEN="$CLEAN_CF_TOKEN"
+          export CLOUDFLARE_ACCOUNT_ID="65aa28b5b1d1c233c0ab798f79342c5b"
+          npx wrangler deploy --config wrangler.jsonc

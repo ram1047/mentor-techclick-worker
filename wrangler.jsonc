@@ -27,6 +27,13 @@
       "migrations_dir": "migrations"
     }
   ],
+  "services": [
+    {
+      "binding": "MENTOR_MAIL",
+      "service": "team-techclick",
+      "entrypoint": "MentorMail"
+    }
+  ],
   "vars": {
     "PUBLIC_URL": "https://mentor.techclick.in",
     "SUPPORT_WHATSAPP": "919277229456",

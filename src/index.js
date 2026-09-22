@@ -76,6 +76,20 @@ function referenceOf(id) {
   return String(id).replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
+async function notifyDesk(env, payload) {
+  try {
+    if (!env.MENTOR_MAIL || typeof env.MENTOR_MAIL.alert !== "function") return false;
+    const result = await env.MENTOR_MAIL.alert(payload);
+    return Boolean(result && result.ok);
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: "desk mail failed",
+      error: error instanceof Error ? error.message : "mail",
+    }));
+    return false;
+  }
+}
+
 function publicMentor(row) {
   let tracks = [];
   let offers = [];
@@ -249,15 +263,37 @@ async function handleApi(request, env, url) {
         (id, mentor_id, name, email, phone, goal, plan, amount_inr, mentor_share_inr, status, payout_status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', 'pending', ?)`,
     ).bind(id, mentor.id, seat.name, seat.email, seat.phone, seat.goal, seat.plan, amount, share, new Date().toISOString()).run();
-    console.log(JSON.stringify({ event: "seat_request", reference: referenceOf(id), plan: seat.plan }));
+    const reference = referenceOf(id);
+    const mailed = await notifyDesk(env, {
+      subject: `Mentor Desk request ${reference}`,
+      intro: "A student submitted a mentor seat request.",
+      replyEmail: seat.email,
+      replyName: seat.name,
+      lines: [
+        { label: "Reference", value: reference },
+        { label: "Student", value: seat.name },
+        { label: "Email", value: seat.email },
+        { label: "WhatsApp", value: seat.phone },
+        { label: "Mentor", value: mentor.name },
+        { label: "Seat", value: seat.plan },
+        { label: "Amount", value: `INR ${amount}` },
+        { label: "Mentor share", value: `INR ${share}` },
+        { label: "Stuck on", value: seat.goal },
+      ],
+    });
+    if (mailed) {
+      await env.DB.prepare("UPDATE seat_requests SET email_sent = 1 WHERE id = ?").bind(id).run();
+    }
+    console.log(JSON.stringify({ event: "seat_request", reference, plan: seat.plan, mailed }));
     return json({
       ok: true,
-      reference: referenceOf(id),
+      reference,
       plan: seat.plan,
       amount_inr: amount,
       mentor_share_inr: share,
       platform_share_inr: amount - share,
       mentor_name: mentor.name,
+      mailed,
       message: "Request received. Techclick will confirm on email or WhatsApp and send the payment step.",
     }, 201);
   }
@@ -295,7 +331,30 @@ async function handleApi(request, env, url) {
       id, app.name, app.email, app.phone, JSON.stringify(app.tracks), app.years,
       app.weekly_inr, app.monthly_inr, app.bio, app.linkedin, app.payout_upi, app.show_profile, new Date().toISOString(),
     ).run();
-    console.log(JSON.stringify({ event: "mentor_application", reference: referenceOf(id) }));
+    const reference = referenceOf(id);
+    const mailed = await notifyDesk(env, {
+      subject: `Mentor application ${reference}`,
+      intro: "Someone applied to mentor on the desk.",
+      replyEmail: app.email,
+      replyName: app.name,
+      lines: [
+        { label: "Reference", value: reference },
+        { label: "Name", value: app.name },
+        { label: "Email", value: app.email },
+        { label: "WhatsApp", value: app.phone },
+        { label: "Tracks", value: app.tracks.join(", ") },
+        { label: "Years", value: String(app.years) },
+        { label: "Weekly price", value: `INR ${app.weekly_inr}` },
+        { label: "Monthly price", value: `INR ${app.monthly_inr}` },
+        { label: "Profile", value: app.show_profile ? "Show" : "Hidden" },
+        { label: "UPI", value: app.payout_upi },
+        { label: "Bio", value: app.bio },
+      ],
+    });
+    if (mailed) {
+      await env.DB.prepare("UPDATE mentor_applications SET email_sent = 1 WHERE id = ?").bind(id).run();
+    }
+    console.log(JSON.stringify({ event: "mentor_application", reference, mailed }));
     return json({
       ok: true,
       reference: referenceOf(id),

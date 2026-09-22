@@ -30,6 +30,7 @@ body {
 img { max-width: 100%; display: block; }
 a { color: inherit; }
 button, input, textarea, select { font: inherit; color: inherit; }
+input, textarea, select { font-size: 16px; }
 h1, h2, h3, p { margin: 0; }
 h1, h2, .ticket-price, .step strong {
   font-family: var(--serif);
@@ -54,13 +55,14 @@ h1, h2, .ticket-price, .step strong {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 10px 18px;
   padding: 14px 22px;
   background: rgba(243, 238, 228, 0.92);
   border-bottom: 1px solid rgba(26, 35, 50, 0.06);
   backdrop-filter: blur(12px);
 }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; min-width: 0; white-space: nowrap; }
 .brand img { height: 34px; width: auto; }
 .brand b { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; }
 .links { display: flex; gap: 6px; margin-left: auto; align-items: center; }
@@ -254,22 +256,44 @@ label.choice input { width: auto; min-height: 22px; }
 .desk-card header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .small { font-size: 14px; }
-.dock {
-  display: none;
+.dock { display: none; }
+.wa-chat {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  z-index: 15;
+  right: 16px;
+  bottom: 20px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #128c7e;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 12px 28px rgba(18, 140, 126, 0.35);
 }
-.dock .btn { width: 100%; box-shadow: var(--shadow); }
+.wa-chat:hover { color: #fff; }
 
 @media (max-width: 860px) {
-  .hero, .money, .grid, .profile, .form-row, .stats { grid-template-columns: 1fr 1fr; }
-  .links a:not(.btn):not(.keep) { display: none; }
-  .links a.keep { display: inline-flex; padding: 0 10px; }
+  .hero, .money, .grid, .profile, .form-row { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .links { width: 100%; margin-left: 0; overflow-x: auto; justify-content: flex-start; }
+  .links a { white-space: nowrap; font-size: 14px; padding: 0 10px; }
   .nav { padding: 10px 12px; }
-  .dock { display: block; }
-  h1 { font-size: 42px; }
+  .brand img { height: 28px; }
+  .brand b { font-size: 12px; letter-spacing: 0.08em; }
+  h1 { font-size: 34px; }
+  .ticket { padding-right: 16px; }
+  .ticket-price { font-size: 34px; }
   .footer { padding-bottom: 96px; }
+  .wa-chat {
+    top: 58%;
+    right: 0;
+    bottom: auto;
+    border-radius: 14px 0 0 14px;
+    padding: 12px 10px;
+    font-size: 13px;
+  }
 }

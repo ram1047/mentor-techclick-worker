@@ -113,8 +113,18 @@ function dock() {
   ]);
 }
 
+function chatButton() {
+  return el("a", {
+    class: "wa-chat",
+    href: wa("Hello Techclick, I have a question about Mentor Desk."),
+    target: "_blank",
+    rel: "noopener",
+    "aria-label": "Chat with Techclick on WhatsApp",
+  }, ["WhatsApp"]);
+}
+
 function shell(current, nodes) {
-  const parts = [nav(current), el("main", { id: "main", class: "wrap" }, nodes), footer()];
+  const parts = [nav(current), el("main", { id: "main", class: "wrap" }, nodes), footer(), chatButton()];
   const bar = dock();
   if (bar) parts.push(bar);
   app.replaceChildren(...parts);
@@ -673,7 +683,7 @@ function requestCard(row, box) {
     ? "Founding mentor. This share is your own desk. Mark mentor paid when the week or month is delivered."
     : `Send ${inr(row.mentor_share_inr)} for this ${row.plan} seat. Mentee phone ${row.phone}.`;
   return el("article", { class: "desk-card" }, [
-    el("header", {}, [el("strong", {}, [`${row.reference} · ${row.name}`]), el("span", { class: "small" }, [`${row.status} · payout ${row.payout_status}`])]),
+    el("header", {}, [el("strong", {}, [`${row.reference} · ${row.name}`]), el("span", { class: "small" }, [`${row.status} · payout ${row.payout_status}${Number(row.email_sent) ? " · emailed support" : ""}`])]),
     el("p", {}, [`${row.mentor_name} · ${row.plan} · mentee pays ${inr(row.amount_inr)} · mentor share ${inr(row.mentor_share_inr)}`]),
     el("p", { class: "small" }, [row.goal]),
     el("p", { class: "small muted" }, [note, ` Email ${row.email}.`]),
@@ -704,7 +714,7 @@ function appCard(row, box) {
   let tracks = row.tracks;
   try { tracks = JSON.parse(row.tracks).join(", "); } catch { tracks = row.tracks; }
   return el("article", { class: "desk-card" }, [
-    el("header", {}, [el("strong", {}, [row.name]), el("span", { class: "small" }, [`${row.years} years`])]),
+    el("header", {}, [el("strong", {}, [row.name]), el("span", { class: "small" }, [`${row.years} years${Number(row.email_sent) ? " · emailed support" : ""}`])]),
     el("p", {}, [tracks]),
     el("p", { class: "small" }, [`Week ${inr(row.weekly_inr)} → mentor ${inr(shareAmount(row.weekly_inr))}. Month ${inr(row.monthly_inr)} → mentor ${inr(shareAmount(row.monthly_inr))}.`]),
     el("p", {}, [row.bio]),

@@ -1,0 +1,2 @@
+ALTER TABLE seat_requests ADD COLUMN email_sent INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE mentor_applications ADD COLUMN email_sent INTEGER NOT NULL DEFAULT 0;
